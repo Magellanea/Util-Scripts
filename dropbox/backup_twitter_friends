@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+import ConfigParser
+import tweepy
+import dropbox
+
+
+class Style:
+    @staticmethod
+    def warning_msg(s):
+        """
+        Returns an ANSI-Colored warning message
+        @param s: The warning content
+        """
+        return "%s%s%s%s %s" %\
+               (Style.BOLD_ON, Style.RED, "WARNING:",
+                Style.RESET, s)
+    @staticmethod
+    def success_msg(s):
+        """
+        Returns an ANSI-Colored success message
+        @param s: The msg content
+        """
+        return "%s%s%s%s %s" %\
+               (Style.BOLD_ON, Style.GREEN, "SUCCESS:",
+                Style.RESET, s)
+    BOLD_ON = '\033[1m'
+    BOLD_OFF = '\033[22m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    RESET = '\033[0m'
+
+
+def get_access_token():
+    try:
+        f = open('access_token_file')
+        code = f.next().strip()
+        return code
+    except IOError:
+        print Style.warning_msg('No .access_token found, starting flow!')
+    result = start_flow()
+    if result is not None:
+        print Style.success_msg('Access token stored')
+        return result
+    else:
+        print Style.warning_msg('Failure to push wot dropbox')
+
+
+def start_dropbox_flow():
+    config = ConfigParser.ConfigParser()
+    config.read('drop_box_file')
+    try:
+        app_key = config.get('Keys', 'app_key')
+        app_secret = config.get('Keys', 'app_secret')
+        flow = dropbox.client.DropboxOAuth2FlowNoRedirect(app_key, app_secret)
+        authorize_url = flow.start()
+        print '1. Go to: ' + authorize_url
+        print '2. Click "Allow" (you might have to log in first)'
+        print '3. Copy the authorization code.'
+        code = raw_input("Enter the authorization code here: ").strip()
+        access_token, user_id = flow.finish(code)
+        print access_token
+        f = open('access_token_file', 'wb')
+        f.write('%s\n' % access_token)
+        f.close
+        return access_token
+    except:
+        print Style.warning_msg('Cannot read keys from dropbox.ini')
+        return None
+
+
+def get_friends_ids():
+    config = ConfigParser.ConfigParser()
+    config.read('twitter_keys_file')
+    try:
+        app_key = config.get('Keys', 'app_key')
+        app_secret = config.get('Keys', 'app_secret')
+        twitter_name = config.get('Keys', 'twitter_name')
+        auth = tweepy.OAuthHandler(app_key, 
+                               app_secret)
+        api = tweepy.API(auth)
+        return api.friends_ids(twitter_name)
+    except:
+        print "Cannot retrieve list currently"
+        return None
+
+
+def upload_file(client, file_name):
+    try:
+        response = client.put_file(file_name, open(file_name))
+        bytes = response['bytes']
+        print Style.success_msg("Uploaded: %d bytes for file:%s" % (bytes, file_name))
+    except:
+        print Style.warning_msg("Couldn't upload file:%s" % file_name)
+
+
+def main():
+    friends_ids = get_friends_ids()
+    if friends_ids is not None:
+        f = open('/usr/local/.twitter_friends', 'wb')
+        for friend_id in friends_ids:
+            f.write('%s\n' % str(friend_id))
+        f.close()
+        token = get_access_token()
+        client = dropbox.client.DropboxClient(token)
+        f = '/usr/local/.twitter_friends'
+        upload_file(client, f)
+        print Style.success_msg("Pushed to dropbox")
+    else:
+        print Style.warning_msg("Couldn't backup friends")
+
+
+if __name__ == "__main__":
+    main()
