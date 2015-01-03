@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+import sqlite3
+import argparse
+import sys
+
+
+def initiate_parser():
+    parser = argparse.ArgumentParser(description="Dump google chrome history")
+    parser.add_argument("db", 
+                        action="store",
+                        type=str,
+                        help="Firefox history file usually ~/.mozilla/firefox/*/places.sqlite")
+    parser.add_argument("urls", 
+                        action="store", 
+                        type=str, 
+                        help="The file to store history dump")
+    return parser
+
+
+def main():
+    parser = initiate_parser()
+    args = parser.parse_args()
+    f = open(args.urls, 'wb')
+    try:
+        conn = sqlite3.connect(args.db)
+        c = conn.cursor()
+        f.write('url\n')
+        for row in c.execute('select p.url from moz_places as p, moz_historyvisits where p.id=moz_historyvisits.place_id;'):
+            f.write('%s\n' % (row[0]))
+        f.close()
+    except:
+        print "Cannot open file using sqlite3" , sys.exc_info()
+
+
+if __name__ == "__main__":
+    main()
