@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+import subprocess
+import argparse
+import ConfigParser
+
+
+class Style:
+    @staticmethod
+    def warning_msg(s):
+        """
+        Returns an ANSI-Colored warning message
+        @param s: The warning content
+        """
+        return "%s%s%s%s %s" %\
+               (Style.BOLD_ON, Style.RED, "WARNING:",
+                Style.RESET, s)
+    @staticmethod
+    def success_msg(s):
+        """
+        Returns an ANSI-Colored success message
+        @param s: The msg content
+        """
+        return "%s%s%s %s" %\
+               (Style.BOLD_ON, Style.GREEN,
+                s, Style.RESET)
+    BOLD_ON = '\033[1m'
+    BOLD_OFF = '\033[22m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    RESET = '\033[0m'
+
+
+def initiate_parser():
+    parser = argparse.ArgumentParser(description="MagDot")
+    parser.add_argument("command", 
+                        action="store",
+                        type=str,
+                        help="The customized command")
+    return parser
+
+
+def get_command_for(command):
+    config = ConfigParser.ConfigParser()
+    list = config.read('./.mag')
+    if (len(list) == 0) or not config.has_option('Commands', command):
+        if not config.has_section('Commands'):
+            config.add_section('Commands')
+        print Style.warning_msg('Cannot find corresponding command')
+        spec = raw_input("Enter the command corresponding to %s:" % Style.success_msg(command))
+        try:
+            f = open('./.mag', 'wb')
+            config.set('Commands', command, spec)
+            config.write(f)
+            f.close()
+            return spec
+        except:
+            print Style.warning_msg('Cannot write to .mag file')
+    else:
+        return config.get('Commands', command)
+
+ 
+def exec_command(command):
+    print Style.success_msg('Executing:%s\n' % command)
+    # TODO change shell=True as it has some privacy concern
+    subprocess.call([command], shell=True)
+
+
+def main():
+    parser = initiate_parser()
+    args = parser.parse_args()
+    current_command = args.command
+    spec_command = get_command_for(current_command)
+    exec_command(spec_command)
+
+if __name__ == "__main__":
+    main()
